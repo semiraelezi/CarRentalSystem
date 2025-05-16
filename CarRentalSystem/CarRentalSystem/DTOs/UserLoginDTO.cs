@@ -1,4 +1,6 @@
-﻿namespace CarRentalSystem.DTOs
+﻿using CarRentalSystem.DTOs;
+
+namespace CarRentalSystem.DTOs
 {
     public class UserLoginDTO
     {
