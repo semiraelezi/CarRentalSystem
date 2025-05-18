@@ -1,5 +1,5 @@
-﻿using CarRentalSystem.Data;
-using CarRentalSystem.DTOs;
+﻿using CarRentalSystem.DTOs;
+using Microsoft.AspNetCore.Identity;
 
 namespace CarRentalSystem.Services.Interfaces
 {
@@ -7,7 +7,9 @@ namespace CarRentalSystem.Services.Interfaces
     {
         Task<string> RegisterAsync(UserRegisterDTO dto);
         Task<string> LoginAsync(UserLoginDTO dto);
-        Task<User?> GetProfileAsync(int userId);
-        Task UpdateProfileAsync(int userId, UserUpdateDTO dto);
+
+        // IdentityUser uses string for Id, so use string here instead of int
+        Task<IdentityUser?> GetProfileAsync(string userId);
+        Task UpdateProfileAsync(string userId, UserUpdateDTO dto);
     }
 }

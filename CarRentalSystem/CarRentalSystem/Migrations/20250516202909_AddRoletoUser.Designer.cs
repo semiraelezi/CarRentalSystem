@@ -11,8 +11,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CarRentalSystem.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250516142635_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250516202909_AddRoletoUser")]
+    partial class AddRoletoUser
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -74,6 +74,10 @@ namespace CarRentalSystem.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");
 

@@ -10,16 +10,18 @@
         public string PasswordHash { get; set; } = null!;
         public string? DriversLicenseNumber { get; set; }
 
-        // Role can be derived from the type of user, or kept for convenience
-        public virtual string Role => "User";
+        // Role is automatically "User" for any User instance
+        public string Role { get; set; } = "User";
     }
 
     public class Admin : User
     {
-        // Add admin-specific properties if needed
-        // For example, admin permissions or admin notes
-        public override string Role => "Admin";
+        public Admin()
+        {
+            // When creating Admin, role is automatically "Admin"
+            Role = "Admin";
+        }
 
-        // Additional admin-specific fields can go here
+        // Admin-specific properties can go here
     }
 }
