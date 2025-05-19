@@ -1,67 +1,94 @@
 ﻿using CarRentalSystem.Data;
 using CarRentalSystem.DTOs;
-using CarRentalSystem.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace CarRentalSystem.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [ApiExplorerSettings(GroupName = "User")]
     public class AuthController : ControllerBase
     {
-        private readonly IUserService _userService;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IUserService userService)
+        public AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration)
         {
-            _userService = userService;
+            _userManager = userManager;
+            _configuration = configuration;
         }
 
-        // User registration (no admin)
+        // Register new user (automatically assigned "User" role)
         [HttpPost("register")]
         public async Task<IActionResult> Register(UserRegisterDTO dto)
         {
-            try
+            var existingUser = await _userManager.FindByEmailAsync(dto.Email);
+            if (existingUser != null)
+                return BadRequest("Email already exists.");
+
+            var user = new ApplicationUser
             {
-                var token = await _userService.RegisterAsync(dto);
-                return Ok(new { Token = token, Message = "User registered successfully." });
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+                Email = dto.Email,
+                UserName = dto.Email,
+                PhoneNumber = dto.PhoneNumber,
+                Name = dto.Name,
+                Surname = dto.Surname
+            };
+
+            var result = await _userManager.CreateAsync(user, dto.Password);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            // Add "User" role
+            await _userManager.AddToRoleAsync(user, "User");
+
+            return Ok("User registered successfully.");
         }
 
-        // User login (admin and user)
+        // Login (both user and admin can login)
         [HttpPost("login")]
         public async Task<IActionResult> Login(UserLoginDTO dto)
         {
-            try
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null || !await _userManager.CheckPasswordAsync(user, dto.Password))
+                return Unauthorized("Invalid credentials.");
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // Create claims for JWT
+            var authClaims = new List<Claim>
             {
-                var token = await _userService.LoginAsync(dto);
-                return Ok(new { Token = token });
-            }
-            catch (System.Exception ex)
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            };
+
+            foreach (var role in roles)
             {
-                return Unauthorized(ex.Message);
+                authClaims.Add(new Claim(ClaimTypes.Role, role));
             }
+
+            var jwtKey = _configuration["Jwt:Key"] ?? "THIS_IS_A_SECRET_KEY";
+            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var token = new JwtSecurityToken(
+                expires: DateTime.Now.AddHours(3),
+                claims: authClaims,
+                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+            );
+
+            return Ok(new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(token),
+                expiration = token.ValidTo,
+                email = user.Email,
+                username = user.UserName,
+                roles = roles
+            });
         }
-
-        // Optional: only admin can create roles or assign roles - secure these later!
-        // You may remove or secure these endpoints as needed.
-
-        //[HttpPost("role")]
-        //public async Task<IActionResult> CreateRole(string roleName)
-        //{
-        //    // Implementation here or move to AdminController
-        //}
-
-        //[HttpPost("assign")]
-        //public async Task<IActionResult> AssignRoleToUser(string email, string roleName)
-        //{
-        //    // Implementation here or move to AdminController
-        //}
     }
 }

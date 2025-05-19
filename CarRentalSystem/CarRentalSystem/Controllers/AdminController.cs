@@ -1,5 +1,5 @@
-﻿using CarRentalSystem.DTOs;
-using CarRentalSystem.Data;
+﻿using CarRentalSystem.Data;
+using CarRentalSystem.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +10,6 @@ namespace CarRentalSystem.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Admin")]
-    [ApiExplorerSettings(GroupName = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
@@ -20,19 +19,17 @@ namespace CarRentalSystem.Controllers
             _userManager = userManager;
         }
 
-        // Search users by name and surname (exclude admins)
         [HttpGet("search-users")]
         public async Task<IActionResult> SearchUsers([FromQuery] string? name, [FromQuery] string? surname)
         {
             var query = _userManager.Users.AsQueryable();
 
             if (!string.IsNullOrEmpty(name))
-                query = query.Where(u => u.Name!.Contains(name));
+                query = query.Where(u => u.Name != null && u.Name.Contains(name));
 
             if (!string.IsNullOrEmpty(surname))
-                query = query.Where(u => u.Surname!.Contains(surname));
+                query = query.Where(u => u.Surname != null && u.Surname.Contains(surname));
 
-            // Exclude Admins
             var users = await query.ToListAsync();
 
             var filteredUsers = new List<ApplicationUser>();
@@ -56,7 +53,6 @@ namespace CarRentalSystem.Controllers
             return Ok(result);
         }
 
-        // Update user by email
         [HttpPut("update-user")]
         public async Task<IActionResult> UpdateUser([FromQuery] string email, [FromBody] UserRegisterDTO dto)
         {
@@ -86,7 +82,6 @@ namespace CarRentalSystem.Controllers
             return Ok("User updated.");
         }
 
-        // Delete user by email
         [HttpDelete("delete-user")]
         public async Task<IActionResult> DeleteUser([FromQuery] string email)
         {
