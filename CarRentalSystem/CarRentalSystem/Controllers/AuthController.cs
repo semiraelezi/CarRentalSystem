@@ -1,11 +1,10 @@
 ﻿using CarRentalSystem.Data;
 using CarRentalSystem.DTOs;
+using CarRentalSystem.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace CarRentalSystem.Controllers
 {
@@ -14,80 +13,60 @@ namespace CarRentalSystem.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IConfiguration _configuration;
+        private readonly AppDbContext _context;
+        private readonly TokenService _tokenService;
 
-        public AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public AuthController(
+            UserManager<ApplicationUser> userManager,
+            AppDbContext context,
+            TokenService tokenService)
         {
             _userManager = userManager;
-            _configuration = configuration;
+            _context = context;
+            _tokenService = tokenService;
         }
 
-        // Register new user (automatically assigned "User" role)
         [HttpPost("register")]
-        public async Task<IActionResult> Register(UserRegisterDTO dto)
+        public async Task<IActionResult> Register(UserRegisterDTO request)
         {
-            var existingUser = await _userManager.FindByEmailAsync(dto.Email);
-            if (existingUser != null)
-                return BadRequest("Email already exists.");
+            var userExists = await _userManager.FindByEmailAsync(request.Email);
+            if (userExists != null)
+                return BadRequest("Email already exists");
 
             var user = new ApplicationUser
             {
-                Email = dto.Email,
-                UserName = dto.Email,
-                PhoneNumber = dto.PhoneNumber,
-                Name = dto.Name,
-                Surname = dto.Surname
+                Email = request.Email,
+                UserName = request.Email,
+                Name = request.Name,
+                Surname = request.Surname
             };
 
-            var result = await _userManager.CreateAsync(user, dto.Password);
+            var result = await _userManager.CreateAsync(user, request.Password);
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            // Add "User" role
-            await _userManager.AddToRoleAsync(user, "User");
-
-            return Ok("User registered successfully.");
+            return Ok("User created");
         }
 
-        // Login (both user and admin can login)
         [HttpPost("login")]
-        public async Task<IActionResult> Login(UserLoginDTO dto)
+        public async Task<IActionResult> Login(UserLoginDTO request)
         {
-            var user = await _userManager.FindByEmailAsync(dto.Email);
-            if (user == null || !await _userManager.CheckPasswordAsync(user, dto.Password))
-                return Unauthorized("Invalid credentials.");
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+                return BadRequest("No user found");
 
-            var roles = await _userManager.GetRolesAsync(user);
+            var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+            if (!passwordValid)
+                return BadRequest("Invalid password");
 
-            // Create claims for JWT
-            var authClaims = new List<Claim>
+            var token = await _tokenService.CreateToken(user);
+
+            return Ok(new LoginResponseDTO
             {
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            };
-
-            foreach (var role in roles)
-            {
-                authClaims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var jwtKey = _configuration["Jwt:Key"] ?? "THIS_IS_A_SECRET_KEY";
-            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-            var token = new JwtSecurityToken(
-                expires: DateTime.Now.AddHours(3),
-                claims: authClaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
-            );
-
-            return Ok(new
-            {
-                token = new JwtSecurityTokenHandler().WriteToken(token),
-                expiration = token.ValidTo,
-                email = user.Email,
-                username = user.UserName,
-                roles = roles
+                Token = token,
+                Email = user.Email,
+                Name = user.Name,
+                Surname = user.Surname
             });
         }
     }

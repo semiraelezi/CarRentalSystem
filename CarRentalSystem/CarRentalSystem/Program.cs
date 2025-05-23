@@ -1,35 +1,49 @@
 using CarRentalSystem.Data;
-using CarRentalSystem.Services.Implementations;
-using CarRentalSystem.Services.Interfaces;
+using CarRentalSystem.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add PostgreSQL DbContext using Npgsql provider
+// Configure EF Core with PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Configure Identity with ApplicationUser and IdentityRole
+// Add Identity with ApplicationUser and roles, configure password options
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
-    options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = false;
     options.Password.RequiredLength = 6;
 })
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
-// JWT config
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "THIS_IS_A_SECRET_KEY_WITH_MIN_256_BITS_!@#";
-var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+// Register TokenService for dependency injection
+builder.Services.AddScoped<TokenService>();
 
+// Read JWT settings from configuration
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+
+var jwtKey = jwtSettings["Key"];
+var jwtIssuer = jwtSettings["Issuer"];
+var jwtAudience = jwtSettings["Audience"];
+
+if (string.IsNullOrEmpty(jwtKey) || string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
+{
+    throw new InvalidOperationException("JWT configuration is missing or incomplete.");
+}
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+// Configure Authentication with JWT Bearer (ONLY ONCE)
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -39,102 +53,85 @@ builder.Services.AddAuthentication(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = false,          // adjust as needed
-        ValidateAudience = false,        // adjust as needed
+        ValidateIssuer = true,
+        ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
-        RoleClaimType = ClaimTypes.Role,
-        NameClaimType = ClaimTypes.Name
+
+        ValidIssuer = "MyIssuer",
+        ValidAudience = "MyAudience",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("qLiw6VbnnQlWj5zv1Lr3liiXswJ93XsQjSvVz8OmhBI="))
+    };
+
+    // Optional: log failures for debugging
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        }
     };
 });
 
-// Add authorization
-builder.Services.AddAuthorization();
-
-// Register your services
-builder.Services.AddScoped<IUserService, UserService>();
-
-// Add controllers
+// Add Controllers
 builder.Services.AddControllers();
 
-// Add Swagger with JWT support
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+// Add Swagger with JWT Bearer support
+builder.Services.AddSwaggerGen(options =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-    {
-        Title = "Car Rental API",
-        Version = "v1"
-    });
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "CarRentalSystem API", Version = "v1" });
 
-    // JWT Bearer token authentication for Swagger
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        In = ParameterLocation.Header,
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
         Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
         Scheme = "Bearer"
     });
 
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            new OpenApiSecurityScheme
             {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                Reference = new OpenApiReference
                 {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
                 }
             },
-            new string[] { }
+            Array.Empty<string>()
         }
     });
 });
 
 var app = builder.Build();
 
-// Automatically apply pending migrations on startup (optional)
+// Seed default admin user on startup
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-    // Ensure "User" role exists
-    if (!await roleManager.RoleExistsAsync("User"))
-        await roleManager.CreateAsync(new IdentityRole("User"));
-
-    // Create fixed admin user if not exists
-    var adminEmail = "semiraelezi@gmail.com";
-    var adminPassword = "Mila1209!";
-    var admin = await userManager.FindByEmailAsync(adminEmail);
-    if (admin == null)
+    var services = scope.ServiceProvider;
+    try
     {
-        admin = new ApplicationUser
-        {
-            Email = adminEmail,
-            UserName = adminEmail,
-            Name = "Semira",
-            Surname = "Elezi"
-        };
-
-        var result = await userManager.CreateAsync(admin, adminPassword);
-        if (result.Succeeded)
-        {
-            if (!await roleManager.RoleExistsAsync("Admin"))
-                await roleManager.CreateAsync(new IdentityRole("Admin"));
-            await userManager.AddToRoleAsync(admin, "Admin");
-        }
+        await DbSeeder.SeedAdminAsync(services);
+        Console.WriteLine("Admin user seeded successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error seeding admin user: {ex.Message}");
     }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();

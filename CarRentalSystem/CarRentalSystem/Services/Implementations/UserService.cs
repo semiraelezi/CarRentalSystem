@@ -1,11 +1,10 @@
 ﻿using CarRentalSystem.DTOs;
 using CarRentalSystem.Data;
+using CarRentalSystem.Services;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using CarRentalSystem.Services.Interfaces;
 
 namespace CarRentalSystem.Services.Implementations
@@ -14,15 +13,15 @@ namespace CarRentalSystem.Services.Implementations
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IConfiguration _config;
+        private readonly TokenService _tokenService;
 
         public UserService(UserManager<ApplicationUser> userManager,
                            SignInManager<ApplicationUser> signInManager,
-                           IConfiguration config)
+                           TokenService tokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _config = config;
+            _tokenService = tokenService;
         }
 
         public async Task<string> RegisterAsync(UserRegisterDTO dto)
@@ -41,10 +40,10 @@ namespace CarRentalSystem.Services.Implementations
             if (!result.Succeeded)
                 throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
 
-            // Add user role only, no admin here
+            // Assign "User" role on registration
             await _userManager.AddToRoleAsync(user, "User");
 
-            return await GenerateJwtToken(user);
+            return await _tokenService.CreateToken(user);
         }
 
         public async Task<string> LoginAsync(UserLoginDTO dto)
@@ -57,36 +56,7 @@ namespace CarRentalSystem.Services.Implementations
             if (!result.Succeeded)
                 throw new Exception("Invalid credentials");
 
-            return await GenerateJwtToken(user);
-        }
-
-        private async Task<string> GenerateJwtToken(ApplicationUser user)
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim("Name", user.Name ?? ""),
-                new Claim("Surname", user.Surname ?? ""),
-                new Claim("DriverLicense", user.DriverLicense ?? "")
-            };
-
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? "THIS_IS_A_SECRET_KEY"));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddHours(3),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return await _tokenService.CreateToken(user);
         }
 
         public Task<IdentityUser?> GetProfileAsync(string userId)
@@ -98,5 +68,7 @@ namespace CarRentalSystem.Services.Implementations
         {
             throw new NotImplementedException();
         }
+
+        // Other methods omitted for brevity...
     }
 }

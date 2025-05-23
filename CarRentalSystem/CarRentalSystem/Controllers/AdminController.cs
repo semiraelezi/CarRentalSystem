@@ -20,17 +20,13 @@ namespace CarRentalSystem.Controllers
         }
 
         [HttpGet("search-users")]
-        public async Task<IActionResult> SearchUsers([FromQuery] string? name, [FromQuery] string? surname)
+        public async Task<IActionResult> SearchUsers([FromQuery] string name, [FromQuery] string surname)
         {
-            var query = _userManager.Users.AsQueryable();
-
-            if (!string.IsNullOrEmpty(name))
-                query = query.Where(u => u.Name != null && u.Name.Contains(name));
-
-            if (!string.IsNullOrEmpty(surname))
-                query = query.Where(u => u.Surname != null && u.Surname.Contains(surname));
-
-            var users = await query.ToListAsync();
+            var users = await _userManager.Users
+                .Where(u => u.Name != null && u.Surname != null &&
+                            u.Name.ToLower().Trim() == name.ToLower().Trim() &&
+                            u.Surname.ToLower().Trim() == surname.ToLower().Trim())
+                .ToListAsync();
 
             var filteredUsers = new List<ApplicationUser>();
             foreach (var user in users)
@@ -39,6 +35,9 @@ namespace CarRentalSystem.Controllers
                 if (!roles.Contains("Admin"))
                     filteredUsers.Add(user);
             }
+
+            if (!filteredUsers.Any())
+                return NotFound("No matching users found.");
 
             var result = filteredUsers.Select(u => new
             {
@@ -54,44 +53,43 @@ namespace CarRentalSystem.Controllers
         }
 
         [HttpPut("update-user")]
-        public async Task<IActionResult> UpdateUser([FromQuery] string email, [FromBody] UserRegisterDTO dto)
+        public async Task<IActionResult> UpdateUser([FromQuery] string name, [FromQuery] string surname, [FromBody] UserRegisterDTO dto)
         {
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.Users
+                .FirstOrDefaultAsync(u => u.Name.ToLower().Trim() == name.ToLower().Trim() &&
+                                          u.Surname.ToLower().Trim() == surname.ToLower().Trim());
+
             if (user == null)
                 return NotFound("User not found.");
 
+            var roles = await _userManager.GetRolesAsync(user);
+            if (roles.Contains("Admin"))
+                return BadRequest("Cannot update an admin user.");
+
             user.Email = dto.Email;
-            user.UserName = dto.Email;
             user.PhoneNumber = dto.PhoneNumber;
-            user.Name = dto.Name;
-            user.Surname = dto.Surname;
             user.DriverLicense = dto.DriverLicense;
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            if (!string.IsNullOrWhiteSpace(dto.Password))
-            {
-                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var passResult = await _userManager.ResetPasswordAsync(user, token, dto.Password);
-                if (!passResult.Succeeded)
-                    return BadRequest(passResult.Errors);
-            }
-
             return Ok("User updated.");
         }
 
         [HttpDelete("delete-user")]
-        public async Task<IActionResult> DeleteUser([FromQuery] string email)
+        public async Task<IActionResult> DeleteUser([FromQuery] string name, [FromQuery] string surname)
         {
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.Users
+                .FirstOrDefaultAsync(u => u.Name.ToLower().Trim() == name.ToLower().Trim() &&
+                                          u.Surname.ToLower().Trim() == surname.ToLower().Trim());
+
             if (user == null)
                 return NotFound("User not found.");
 
             var roles = await _userManager.GetRolesAsync(user);
             if (roles.Contains("Admin"))
-                return BadRequest("Cannot delete admin user.");
+                return BadRequest("Cannot delete an admin user.");
 
             var result = await _userManager.DeleteAsync(user);
             if (!result.Succeeded)

@@ -4,6 +4,6 @@
     {
         public string Email { get; set; } = null!;
         public string PhoneNumber { get; set; } = null!;
-        public string? DriversLicenseNumber { get; set; }
+        public string? DriverLicense { get; set; }
     }
 }
