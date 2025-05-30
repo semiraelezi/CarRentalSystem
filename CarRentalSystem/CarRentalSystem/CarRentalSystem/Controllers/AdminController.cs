@@ -91,13 +91,11 @@ namespace CarRentalSystem.Controllers
             if (roles.Contains("Admin"))
                 return BadRequest("Cannot delete an admin user.");
 
-            var email = user.Email;
-
             var result = await _userManager.DeleteAsync(user);
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            return Ok($"User with email '{email}' has been deleted.");
+            return Ok("User deleted.");
         }
     }
-   }
+}
