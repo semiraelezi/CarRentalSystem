@@ -1,5 +1,7 @@
 using CarRentalSystem.Data;
 using CarRentalSystem.Services;
+using CarRentalSystem.Services.Implementations;
+using CarRentalSystem.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +30,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
 // Register TokenService for dependency injection
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ICarService, CarService>();
+builder.Services.AddScoped<IUserService, UserService>();
+
 
 // Read JWT settings from configuration
 var jwtSettings = builder.Configuration.GetSection("Jwt");
