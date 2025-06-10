@@ -5,22 +5,18 @@ using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CarRentalSystem.Services.Implementations; // Add this to use SimpleEmailSender
 
 public class RentalService : IRentalService
 {
     private readonly AppDbContext _context;
+    private readonly SimpleEmailSender _emailSender = new SimpleEmailSender();
 
     public RentalService(AppDbContext context)
     {
         _context = context;
     }
 
-  
-
-
-
-
-    // Returns the RentalId of the created rental, or 0 if creation failed
     public async Task<int> CreateRentalAsync(CreateRentalDTO rentalDto)
     {
         var availableCar = await _context.Cars
@@ -37,7 +33,7 @@ public class RentalService : IRentalService
             .FirstOrDefaultAsync();
 
         if (availableCar == null)
-            return 0; // No available car found
+            return 0;
 
         var rental = new Rental
         {
@@ -58,7 +54,12 @@ public class RentalService : IRentalService
         _context.Rentals.Add(rental);
         await _context.SaveChangesAsync();
 
-        return rental.RentalId; // Return the generated ID
+        // ✅ Send confirmation email
+        var subject = "Rental Booked Successfully";
+        var body = $"Hi {rentalDto.Name},<br>Your rental for a {availableCar.Make} {availableCar.Model} from {rentalDto.PickUpDate:dd/MM/yyyy} to {rentalDto.ReturnDate:dd/MM/yyyy} has been booked.<br>Total Price: {rental.TotalPrice:C}.<br>Thank you!";
+        await _emailSender.SendEmail(rentalDto.Email, subject, body);
+
+        return rental.RentalId;
     }
 
     public async Task<bool> CancelRentalAsync(int rentalId)
@@ -69,6 +70,12 @@ public class RentalService : IRentalService
 
         _context.Rentals.Remove(rental);
         await _context.SaveChangesAsync();
+
+        // ✅ Send cancellation email
+        var subject = "Rental Canceled";
+        var body = $"Hello {rental.Name},<br>Your rental scheduled from {rental.PickUpDate:dd/MM/yyyy} to {rental.ReturnDate:dd/MM/yyyy} has been canceled.";
+        await _emailSender.SendEmail(rental.Email, subject, body);
+
         return true;
     }
 
@@ -76,6 +83,4 @@ public class RentalService : IRentalService
     {
         throw new NotImplementedException();
     }
-
-   
 }

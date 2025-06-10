@@ -33,6 +33,8 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<ICarService, CarService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRentalService, RentalService>();
+builder.Services.AddTransient<SimpleEmailSender>();
+
 
 
 // Read JWT settings from configuration
