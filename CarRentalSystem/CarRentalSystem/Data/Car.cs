@@ -15,6 +15,9 @@
         public string Color { get; set; }
         public string LicensePlate { get; set; }
 
+        public bool IsAvailable { get; set; } = true;
+
+
         public ICollection<Rental>Rentals { get; set; }
     }
     

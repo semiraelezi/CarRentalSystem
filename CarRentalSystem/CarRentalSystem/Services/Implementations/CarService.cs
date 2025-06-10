@@ -33,7 +33,8 @@ namespace CarRentalSystem.Services.Implementations
                     Transmission = car.Transmission,
                     Seats = car.Seats,
                     Color = car.Color,
-                    LicensePlate = car.LicensePlate
+                    LicensePlate = car.LicensePlate,
+                    IsAvailable = car.IsAvailable
                 }).ToListAsync();
         }
 
@@ -55,7 +56,8 @@ namespace CarRentalSystem.Services.Implementations
                 Transmission = car.Transmission,
                 Seats = car.Seats,
                 Color = car.Color,
-                LicensePlate = car.LicensePlate
+                LicensePlate = car.LicensePlate,
+                IsAvailable = car.IsAvailable
             };
         }
 
@@ -73,13 +75,13 @@ namespace CarRentalSystem.Services.Implementations
                 Transmission = carDto.Transmission,
                 Seats = carDto.Seats,
                 Color = carDto.Color,
-                LicensePlate = carDto.LicensePlate
+                LicensePlate = carDto.LicensePlate,
+                IsAvailable = true // default to available on creation
             };
 
             _context.Cars.Add(car);
             await _context.SaveChangesAsync();
 
-            // Return the created car as DTO
             return new CarDTO
             {
                 CarId = car.CarId,
@@ -93,7 +95,8 @@ namespace CarRentalSystem.Services.Implementations
                 Transmission = car.Transmission,
                 Seats = car.Seats,
                 Color = car.Color,
-                LicensePlate = car.LicensePlate
+                LicensePlate = car.LicensePlate,
+                IsAvailable = car.IsAvailable
             };
         }
 
@@ -103,11 +106,11 @@ namespace CarRentalSystem.Services.Implementations
             if (car == null)
                 return false;
 
-            // Update only the fields present in CarUpdateDTO
             car.PricePerDay = dto.PricePerDay;
             car.Discount = dto.Discount;
             car.Color = dto.Color;
             car.LicensePlate = dto.LicensePlate;
+            car.IsAvailable = dto.IsAvailable; // update status too
 
             await _context.SaveChangesAsync();
             return true;
