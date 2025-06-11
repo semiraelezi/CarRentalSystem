@@ -1,8 +1,8 @@
-﻿namespace CarRentalSystem.Data
+﻿namespace CarRentalSystem.DTOs
 {
-    public class Car
+    public class CarDTO
     {
-        public int CarId { get; set; }  // Required primary key
+        public int CarId { get; set; }
         public string Make { get; set; }
         public string Model { get; set; }
         public int Year { get; set; }
@@ -14,11 +14,9 @@
         public int Seats { get; set; }
         public string Color { get; set; }
         public string LicensePlate { get; set; }
+        public bool IsAvailable { get; set; }
+        public string Status => IsAvailable ? "Available" : "Not Available";
 
-        public bool IsAvailable { get; set; } = true;
-
-
-        public ICollection<Rental>Rentals { get; set; }
     }
-    
+
 }

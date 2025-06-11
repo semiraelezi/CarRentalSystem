@@ -1,8 +1,7 @@
-﻿namespace CarRentalSystem.Data
+﻿namespace CarRentalSystem.DTOs
 {
-    public class Car
+    public class CarCreateDTO
     {
-        public int CarId { get; set; }  // Required primary key
         public string Make { get; set; }
         public string Model { get; set; }
         public int Year { get; set; }
@@ -14,11 +13,5 @@
         public int Seats { get; set; }
         public string Color { get; set; }
         public string LicensePlate { get; set; }
-
-        public bool IsAvailable { get; set; } = true;
-
-
-        public ICollection<Rental>Rentals { get; set; }
     }
-    
 }
