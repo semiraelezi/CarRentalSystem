@@ -1,52 +1,68 @@
-// src/api/cars.js
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+};
+
+// Helper function for error handling
+const handleResponse = async (res) => {
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = errorData.message || `Request failed with status ${res.status}`;
+    throw new Error(errorMessage);
+  }
+  return res.json();
+};
+
 export async function fetchCars() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          {
-            id: 1,
-            make: 'Volkswagen',
-            model: 'Golf',
-            year: 2022,
-            fuel: 'Benzine',
-            seats: 5,
-            price: 35,
-            transmission: 'Automatic',
-            type: 'hatchback',
-            licensePlate: 'SK-1234-AB',
-            color: 'Blue',
-          },
-          {
-            id: 2,
-            make: 'Tesla',
-            model: 'Model 3',
-            year: 2023,
-            fuel: 'Electric',
-            seats: 5,
-            price: 70,
-            transmission: 'Automatic',
-            type: 'electric',
-            licensePlate: 'SK-5678-CD',
-            color: 'White',
-          },
-        ]);
-      }, 400);
+  const res = await fetch('/api/car', {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// Helper to prepare car data
+const prepareCarData = (car) => ({
+  make: car.make,
+  model: car.model,
+  year: Number(car.year),
+  fuel: car.fuel,
+  seats: Number(car.seats),
+  pricePerDay: Number(car.price),
+  transmission: car.transmission,
+  type: car.type,
+  licensePlate: car.licensePlate,
+  color: car.color,
+});
+
+export async function saveCar(car) {
+  const headers = getAuthHeaders();
+  const body = JSON.stringify(prepareCarData(car));
+
+  if (car.id || car.carId) {
+    const id = car.id ?? car.carId;
+    const res = await fetch(`/api/car/${id}`, {
+      method: 'PUT',
+      headers,
+      body,
     });
-  }
-  
-  export async function saveCar(carData) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ ...carData, id: carData.id || Date.now() });
-      }, 300);
+    return handleResponse(res);
+  } else {
+    const res = await fetch('/api/car', {
+      method: 'POST',
+      headers,
+      body,
     });
+    return handleResponse(res);
   }
-  
-  export async function deleteCar(carId) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, carId });
-      }, 300);
-    });
-  }
-  
+}
+
+export async function deleteCar(id) {
+  const res = await fetch(`/api/car/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}

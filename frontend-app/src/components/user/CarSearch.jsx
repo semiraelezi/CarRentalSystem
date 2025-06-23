@@ -1,105 +1,214 @@
-import { useState } from 'react';
-import { Container, Typography, Box, Button, TextField, Paper, Grid } from '@mui/material';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import React, { useState, useEffect } from 'react';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Grid,
+  Card,
+  CircularProgress,
+  Alert,
+  Paper,
+  Chip,
+} from '@mui/material';
+import { fetchCars } from '../../api/cars';
+// Import Link from react-router-dom for navigation
+import { Link as RouterLink } from 'react-router-dom';
 
-export default function CarSearch() {
-  const [pickupDate, setPickupDate] = useState(null);
-  const [returnDate, setReturnDate] = useState(null);
+export default function HomePage() {
+  const [cars, setCars] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadCars = async () => {
+      try {
+        const data = await fetchCars();
+        setCars(data);
+      } catch (err) {
+        setError('Failed to load cars. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCars();
+  }, []);
+
+  const filteredCars = cars.filter(car =>
+    (car.make?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (car.model?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (car.type?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to bottom right, #fff 60%, #1565c0 100%)',
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
+      {/* Blue background for the search card */}
+      <Box sx={{ 
+        background: '#1976d2',
+        pt: 8, pb: 6, px: 2,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <Typography variant="h2" sx={{ fontWeight: 900, mb: 4, color: '#222' }}>
-              PREMIUM<br />CAR RENTAL<br />IN MACEDONIA!
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={6} sx={{ textAlign: 'right', position: 'relative' }}>
-            <img
-              src="https://cdn.pixabay.com/photo/2017/01/06/19/15/auto-1957037_1280.jpg"
-              alt="Car"
-              style={{ width: '100%', maxWidth: 550, zIndex: 2 }}
-            />
-          </Grid>
-        </Grid>
+        width: '100%',
+      }}>
+        <Typography variant="h3" sx={{ 
+          fontWeight: 'bold', 
+          mb: 2, 
+          textAlign: 'center',
+          color: '#fff'
+        }}>
+          PREMIUM <br /> CAR RENTAL <br /> IN MACEDONIA!
+        </Typography>
+
+        {/* Search card with improved design */}
         <Paper
-          elevation={6}
+          elevation={8}
           sx={{
-            p: 2,
-            mt: { xs: 4, md: -8 },
-            maxWidth: 900,
-            mx: 'auto',
-            borderRadius: 4,
             display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
             alignItems: 'center',
+            p: 3,
+            mt: 2,
+            borderRadius: 3,
+            minWidth: 300,
+            maxWidth: 1000,
+            width: '100%',
             gap: 2,
-            position: 'relative',
-            zIndex: 3,
+            background: '#fff',
           }}
         >
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">Pick-up Location</Typography>
-            <TextField fullWidth placeholder="Pick-Up Location" variant="outlined" size="small" sx={{ bgcolor: '#fff', borderRadius: 2 }} />
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">Return Location</Typography>
-            <TextField fullWidth placeholder="Return Location" variant="outlined" size="small" sx={{ bgcolor: '#fff', borderRadius: 2 }} />
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">Pick-up and Return Date-Time</Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <DatePicker
-                selected={pickupDate}
-                onChange={date => setPickupDate(date)}
-                placeholderText="Select Date-Time"
-                showTimeSelect
-                dateFormat="Pp"
-                customInput={<TextField variant="outlined" size="small" sx={{ bgcolor: '#fff', borderRadius: 2, width: 130 }} />}
-              />
-              <DatePicker
-                selected={returnDate}
-                onChange={date => setReturnDate(date)}
-                placeholderText="Select Date-Time"
-                showTimeSelect
-                dateFormat="Pp"
-                customInput={<TextField variant="outlined" size="small" sx={{ bgcolor: '#fff', borderRadius: 2, width: 130 }} />}
-              />
-            </Box>
-          </Box>
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            sx={{ height: 48, borderRadius: 3, px: 4, fontWeight: 700 }}
+          <TextField
+            label="Pick-up Location"
+            variant="outlined"
+            sx={{ flex: 1 }}
+            size="small"
+          />
+          <TextField
+            label="Return Location"
+            variant="outlined"
+            sx={{ flex: 1 }}
+            size="small"
+          />
+          <TextField
+            label="Pick-up Date-Time"
+            type="datetime-local"
+            InputLabelProps={{ shrink: true }}
+            sx={{ flex: 1 }}
+            size="small"
+          />
+          <TextField
+            label="Return Date-Time"
+            type="datetime-local"
+            InputLabelProps={{ shrink: true }}
+            sx={{ flex: 1 }}
+            size="small"
+          />
+          <TextField
+            label="Search car..."
+            variant="outlined"
+            sx={{ flex: 1 }}
+            size="small"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+          <Button 
+            variant="contained" 
+            color="primary" 
+            sx={{ 
+              px: 4, 
+              height: 40,
+              textTransform: 'none',
+              fontWeight: 'bold',
+              borderRadius: 2
+            }}
           >
             SEARCH
           </Button>
         </Paper>
+      </Box>
+
+      {/* Car Listing Section - UPDATED CARD DESIGN */}
+      <Container maxWidth="lg" sx={{ mt: 6 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : filteredCars.length === 0 ? (
+          <Typography variant="h6" align="center" sx={{ mt: 4 }}>
+            No cars found matching your search
+          </Typography>
+        ) : (
+          <Grid container spacing={3}>
+            {filteredCars.map(car => (
+              <Grid item xs={12} key={car.carId || car.id}>
+                <Card
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: 4,
+                    boxShadow: 2,
+                    p: 2,
+                    minHeight: 140,
+                  }}
+                >
+                  {/* Car Details */}
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        {car.make} {car.model}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        &nbsp;or similar
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {car.year} • {car.transmission}
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                      <Chip label={car.fuel} size="small" />
+                      <Chip label={`${car.seats} Seats`} size="small" />
+                      <Chip 
+                        label={car.type.charAt(0).toUpperCase() + car.type.slice(1)} 
+                        size="small" 
+                      />
+                      <Chip label={car.transmission} size="small" />
+                    </Box>
+                  </Box>
+                  
+                  {/* Price and Button */}
+                  <Box sx={{ minWidth: 120, textAlign: 'right', ml: 2 }}>
+                    <Typography variant="h5" sx={{ color: '#1976d2', fontWeight: 'bold' }}>
+                      ${car.pricePerDay}
+                      <Typography component="span" variant="body2" color="text.secondary">
+                        &nbsp;/ day
+                      </Typography>
+                    </Typography>
+                    <Button
+                      component={RouterLink}
+                      to="/rent"
+                      variant="contained"
+                      color="primary"
+                      sx={{
+                        mt: 2,
+                        borderRadius: 2,
+                        fontWeight: 'bold',
+                        px: 3,
+                        boxShadow: 1,
+                      }}
+                    >
+                      BOOK NOW
+                    </Button>
+                  </Box>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
       </Container>
-      {/* Decorative blue shape in the background */}
-      <Box
-        sx={{
-          position: 'absolute',
-          right: 0,
-          bottom: 0,
-          width: { xs: '70vw', md: '50vw' },
-          height: { xs: '50vw', md: '40vw' },
-          bgcolor: '#1565c0',
-          borderTopLeftRadius: '50vw',
-          zIndex: 0,
-        }}
-      />
     </Box>
   );
 }

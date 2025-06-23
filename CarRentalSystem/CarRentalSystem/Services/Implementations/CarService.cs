@@ -110,7 +110,7 @@ namespace CarRentalSystem.Services.Implementations
             car.Discount = dto.Discount;
             car.Color = dto.Color;
             car.LicensePlate = dto.LicensePlate;
-            car.IsAvailable = dto.IsAvailable; // update status too
+            car.IsAvailable = dto.IsAvailable;
 
             await _context.SaveChangesAsync();
             return true;

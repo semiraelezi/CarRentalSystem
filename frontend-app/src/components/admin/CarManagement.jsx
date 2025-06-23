@@ -24,6 +24,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
 import { fetchCars, saveCar, deleteCar } from '../../api/cars';
 
 const fuelOptions = ['Benzine', 'Diesel', 'Electric'];
@@ -62,12 +63,23 @@ export default function CarManagement() {
     loadCars();
   }, []);
 
-  // Open modal for add or edit
   const handleOpen = (car = null) => {
     setEditingCar(car);
     setForm(
       car
-        ? { ...car }
+        ? {
+            ...car,
+            price: car.pricePerDay ?? car.price ?? '',
+            seats: car.seats?.toString() ?? '',
+            year: car.year?.toString() ?? '',
+            transmission: car.transmission ?? '',
+            fuel: car.fuel ?? '',
+            type: car.type ?? '',
+            licensePlate: car.licensePlate ?? '',
+            make: car.make ?? '',
+            model: car.model ?? '',
+            color: car.color ?? '',
+          }
         : {
             make: '',
             model: '',
@@ -82,59 +94,80 @@ export default function CarManagement() {
           }
     );
     setOpen(true);
+    setError(null);
   };
 
-  // Close modal
   const handleClose = () => {
     setOpen(false);
     setEditingCar(null);
+    setError(null);
   };
 
-  // Handle form input
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Add or Edit car
   const handleSubmit = async () => {
+    const {
+      make, model, year, fuel, seats,
+      price, transmission, type, licensePlate,
+      color,
+    } = form;
+
     if (
-      !form.make ||
-      !form.model ||
-      !form.year ||
-      !form.fuel ||
-      !form.seats ||
-      !form.price ||
-      !form.transmission ||
-      !form.type ||
-      !form.licensePlate ||
-      !form.color
+      !make || !model || !year || !fuel || !seats || !price ||
+      !transmission || !type || !licensePlate || !color
     ) {
       alert('Please fill in all fields.');
       return;
     }
+
     try {
-      const savedCar = await saveCar(form);
+      setLoading(true);
+      const carData = {
+        make,
+        model,
+        year,
+        fuel,
+        seats,
+        price,
+        transmission,
+        type,
+        licensePlate,
+        color,
+      };
+      if (editingCar) {
+        carData.id = editingCar.carId ?? editingCar.id;
+      }
+      const savedCar = await saveCar(carData);
+
       if (editingCar) {
         setCars((prev) =>
-          prev.map((car) => (car.id === editingCar.id ? savedCar : car))
+          prev.map((car) =>
+            car.carId === savedCar.carId || car.id === savedCar.id ? savedCar : car
+          )
         );
       } else {
         setCars((prev) => [...prev, savedCar]);
       }
       handleClose();
     } catch (err) {
-      alert('Failed to save car');
+      alert(err.message || 'Failed to save car');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Delete car
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this car?')) {
       try {
+        setLoading(true);
         await deleteCar(id);
-        setCars((prev) => prev.filter((car) => car.id !== id));
+        setCars((prev) => prev.filter((car) => car.carId !== id && car.id !== id));
       } catch (err) {
-        alert('Failed to delete car');
+        alert(err.message || 'Failed to delete car');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -174,28 +207,6 @@ export default function CarManagement() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {cars.map((car) => (
-              <TableRow key={car.id}>
-                <TableCell>{car.make}</TableCell>
-                <TableCell>{car.model}</TableCell>
-                <TableCell>{car.year}</TableCell>
-                <TableCell>{car.fuel}</TableCell>
-                <TableCell>{car.seats}</TableCell>
-                <TableCell>{car.type}</TableCell>
-                <TableCell>${car.price}</TableCell>
-                <TableCell>{car.transmission}</TableCell>
-                <TableCell>{car.licensePlate}</TableCell>
-                <TableCell>{car.color}</TableCell>
-                <TableCell align="right">
-                  <IconButton color="primary" onClick={() => handleOpen(car)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => handleDelete(car.id)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
             {cars.length === 0 && (
               <TableRow>
                 <TableCell colSpan={11} align="center">
@@ -203,28 +214,40 @@ export default function CarManagement() {
                 </TableCell>
               </TableRow>
             )}
+            {cars.map((car) => (
+              <TableRow key={car.carId ?? car.id}>
+                <TableCell>{car.make}</TableCell>
+                <TableCell>{car.model}</TableCell>
+                <TableCell>{car.year}</TableCell>
+                <TableCell>{car.fuel}</TableCell>
+                <TableCell>{car.seats}</TableCell>
+                <TableCell>{car.type}</TableCell>
+                <TableCell>${car.pricePerDay ?? car.price}</TableCell>
+                <TableCell>{car.transmission}</TableCell>
+                <TableCell>{car.licensePlate}</TableCell>
+                <TableCell>{car.color}</TableCell>
+                <TableCell align="right">
+                  <IconButton color="primary" onClick={() => handleOpen(car)}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    color="error"
+                    onClick={() => handleDelete(car.carId ?? car.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
-      {/* Add/Edit Car Modal */}
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>{editingCar ? 'Edit Car' : 'Add Car'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Make"
-              name="make"
-              value={form.make}
-              onChange={handleChange}
-              fullWidth
-            />
-            <TextField
-              label="Model"
-              name="model"
-              value={form.model}
-              onChange={handleChange}
-              fullWidth
-            />
+            <TextField label="Make" name="make" value={form.make} onChange={handleChange} fullWidth />
+            <TextField label="Model" name="model" value={form.model} onChange={handleChange} fullWidth />
             <TextField
               label="Year"
               name="year"
@@ -232,6 +255,7 @@ export default function CarManagement() {
               onChange={handleChange}
               fullWidth
               type="number"
+              inputProps={{ min: 1900, max: new Date().getFullYear() + 1 }}
             />
             <TextField
               label="Fuel"
@@ -254,6 +278,7 @@ export default function CarManagement() {
               onChange={handleChange}
               fullWidth
               type="number"
+              inputProps={{ min: 1, max: 15 }}
             />
             <TextField
               label="Type"
@@ -276,6 +301,7 @@ export default function CarManagement() {
               onChange={handleChange}
               fullWidth
               type="number"
+              inputProps={{ min: 0 }}
             />
             <TextField
               label="Transmission"
@@ -291,20 +317,14 @@ export default function CarManagement() {
               onChange={handleChange}
               fullWidth
             />
-            <TextField
-              label="Color"
-              name="color"
-              value={form.color}
-              onChange={handleChange}
-              fullWidth
-            />
+            <TextField label="Color" name="color" value={form.color} onChange={handleChange} fullWidth />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} color="inherit">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
+          <Button onClick={handleSubmit} variant="contained" color="primary" disabled={loading}>
             {editingCar ? 'Update' : 'Add'}
           </Button>
         </DialogActions>

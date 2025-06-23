@@ -1,29 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import {
-  Container,
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Paper,
-  Grid,
-  Chip,
-  Checkbox,
-  FormControlLabel,
-  Divider,
-  Stack,
-  MenuItem, 
+import { 
+  Container, Box, Typography, Button, Paper, Chip, Stack, 
+  CircularProgress, Alert, FormControlLabel, Checkbox, TextField, MenuItem 
 } from '@mui/material';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
-import AirlineSeatReclineNormalIcon from '@mui/icons-material/AirlineSeatReclineNormal';
-import ElectricCarIcon from '@mui/icons-material/ElectricCar';
-import SettingsIcon from '@mui/icons-material/Settings';
+import { DirectionsCar, LocalGasStation, AirlineSeatReclineNormal, ElectricCar, Settings } from '@mui/icons-material';
 import { openBookingModal } from '../../redux/slices/bookingSlice';
 import BookingModal from '../booking/BookingModal';
+import { fetchCars } from '../../api/cars';
 
 const carTypes = [
   { label: 'Hatchback', value: 'hatchback' },
@@ -32,185 +16,105 @@ const carTypes = [
   { label: 'Electric', value: 'electric' },
 ];
 
-const cars = [
-  {
-    id: 1,
-    make: 'Volkswagen',
-    model: 'Golf',
-    year: 2022,
-    fuel: 'Benzine',
-    seats: 5,
-    price: 35,
-    image: 'https://cdn.pixabay.com/photo/2017/01/06/19/15/auto-1957037_1280.jpg',
-    transmission: 'Automatic',
-    type: 'hatchback',
-  },
-  {
-    id: 2,
-    make: 'Tesla',
-    model: 'Model 3',
-    year: 2023,
-    fuel: 'Electric',
-    seats: 5,
-    price: 70,
-    image: 'https://cdn.pixabay.com/photo/2019/12/10/14/55/tesla-4682473_1280.jpg',
-    transmission: 'Automatic',
-    type: 'electric',
-  },
-  {
-    id: 3,
-    make: 'BMW',
-    model: '320d',
-    year: 2021,
-    fuel: 'Diesel',
-    seats: 5,
-    price: 50,
-    image: 'https://cdn.pixabay.com/photo/2015/01/19/13/51/car-604019_1280.jpg',
-    transmission: 'Manual',
-    type: 'sedan',
-  },
-];
-
 export default function RentACar() {
   const dispatch = useDispatch();
-  const [pickupDate, setPickupDate] = useState(null);
-  const [returnDate, setReturnDate] = useState(null);
   const [fuelType, setFuelType] = useState('');
   const [selectedTypes, setSelectedTypes] = useState([]);
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Filter logic
+  useEffect(() => {
+    const loadCars = async () => {
+      try {
+        const data = await fetchCars();
+        setCars(data);
+      } catch (err) {
+        setError('Failed to load cars. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCars();
+  }, []);
+
   const filteredCars = cars.filter(car => {
-    const fuelMatch = fuelType ? car.fuel.toLowerCase() === fuelType.toLowerCase() : true;
+    const fuelMatch = fuelType ? car.fuel?.toLowerCase() === fuelType.toLowerCase() : true;
     const typeMatch = selectedTypes.length > 0 ? selectedTypes.includes(car.type) : true;
     return fuelMatch && typeMatch;
   });
 
-  // Handle car type checkbox
   const handleTypeChange = (type) => {
-    setSelectedTypes(prev =>
+    setSelectedTypes(prev => 
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
-  // Booking handler
   const handleBookNow = (car) => {
-    dispatch(openBookingModal(car));
+    const today = new Date();
+    const defaultRental = {
+      carId: car.id,
+      carType: car.type,
+      make: car.make,
+      model: car.model,
+      pickupLocation: '',
+      returnLocation: '',
+      pickUpDate: today.toISOString().slice(0,10),
+      returnDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0,10),
+      name: '',
+      surname: '',
+      email: '',
+      phoneNumber: '',
+      driversLicenseNumber: '',
+      pricePerDay: car.pricePerDay
+    };
+
+    dispatch(openBookingModal(defaultRental));
   };
 
+  if (loading) return <CircularProgress sx={{ display: 'block', mx: 'auto', my: 10 }} />;
+  if (error) return <Alert severity="error" sx={{ my: 4 }}>{error}</Alert>;
+
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to bottom right, #fff 60%, #1565c0 100%)',
-        py: 6,
-        px: 2,
-      }}
-    >
+    <Box sx={{ py: 6, px: 2 }}>
       <Container maxWidth="xl">
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 4, color: '#1565c0' }}>
           Rent a Car
         </Typography>
-        <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-          {/* LEFT: Car List */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+        
+        <Box sx={{ display: 'flex', gap: 3 }}>
+          <Box sx={{ flex: 1 }}>
             <Stack spacing={4}>
-              {filteredCars.length === 0 && (
+              {filteredCars.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center' }}>
-                  <Typography>No cars found for your criteria.</Typography>
+                  <Typography>No cars found matching your filters</Typography>
                 </Paper>
-              )}
-              {filteredCars.map(car => (
-                <Paper
-                  key={car.id}
-                  elevation={4}
-                  sx={{
-                    p: 2,
-                    borderRadius: 4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                    bgcolor: '#f7f9fc',
-                    minHeight: 140,
-                  }}
-                >
-                  {/* Car Image */}
-                  <Box
-                    sx={{
-                      minWidth: 160,
-                      maxWidth: 180,
-                      height: 120,
-                      overflow: 'hidden',
-                      borderRadius: 3,
-                      background: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <img
-                      src={car.image}
-                      alt={`${car.make} ${car.model}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </Box>
-                  {/* Car Details */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
+              ) : filteredCars.map(car => (
+                <Paper key={car.id} elevation={4} sx={{ p: 2, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Box sx={{ flex: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {car.make} {car.model}{' '}
-                      <Typography variant="caption" color="text.secondary" component="span">
-                        or similar
-                      </Typography>
+                      {car.make} {car.model}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       {car.year} • {car.transmission}
                     </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
-                      <Chip
-                        icon={<LocalGasStationIcon />}
-                        label={car.fuel}
-                        size="small"
-                        sx={{ bgcolor: '#e3eafc', fontWeight: 500 }}
-                      />
-                      <Chip
-                        icon={<AirlineSeatReclineNormalIcon />}
-                        label={`${car.seats} Seats`}
-                        size="small"
-                        sx={{ bgcolor: '#e3eafc', fontWeight: 500 }}
-                      />
-                      <Chip
-                        icon={<DirectionsCarIcon />}
-                        label={car.type.charAt(0).toUpperCase() + car.type.slice(1)}
-                        size="small"
-                        sx={{ bgcolor: '#e3eafc', fontWeight: 500 }}
-                      />
-                      <Chip
-                        icon={car.fuel === 'Electric' ? <ElectricCarIcon /> : <SettingsIcon />}
-                        label={car.transmission}
-                        size="small"
-                        sx={{ bgcolor: '#e3eafc', fontWeight: 500 }}
-                      />
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                      <Chip icon={<LocalGasStation />} label={car.fuel} size="small" />
+                      <Chip icon={<AirlineSeatReclineNormal />} label={`${car.seats} Seats`} size="small" />
+                      <Chip icon={<DirectionsCar />} label={car.type} size="small" />
+                      <Chip icon={car.fuel === 'Electric' ? <ElectricCar /> : <Settings />} 
+                            label={car.transmission} size="small" />
                     </Stack>
-                    <Button
-                      variant="text"
-                      size="small"
-                      sx={{ color: '#1565c0', textTransform: 'none', fontWeight: 600 }}
-                    >
-                      View All Specifications
-                    </Button>
                   </Box>
-                  {/* Price & Book */}
                   <Box sx={{ minWidth: 150, textAlign: 'center' }}>
                     <Typography variant="h5" color="primary" sx={{ fontWeight: 700 }}>
-                      ${car.price}{' '}
-                      <Typography variant="body2" component="span">
-                        / day
-                      </Typography>
+                      ${car.pricePerDay} <Typography component="span">/ day</Typography>
                     </Typography>
                     <Button
                       variant="contained"
                       color="primary"
                       size="large"
-                      sx={{ borderRadius: 3, fontWeight: 700, mt: 2, px: 4 }}
+                      sx={{ mt: 2, px: 4 }}
                       onClick={() => handleBookNow(car)}
                     >
                       Book Now
@@ -220,115 +124,40 @@ export default function RentACar() {
               ))}
             </Stack>
           </Box>
-
-          {/* RIGHT: Sidebar Search & Filter */}
-          <Box sx={{ width: 320, flexShrink: 0 }}>
-            <Paper
-              elevation={6}
-              sx={{
-                p: 3,
-                borderRadius: 4,
-                bgcolor: '#fff',
-                position: 'sticky',
-                top: 32,
-              }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                Search & Filter
-              </Typography>
-              <TextField
-                label="Pick-up Location"
-                variant="outlined"
-                size="small"
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Return Location"
-                variant="outlined"
-                size="small"
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                Pick-up Date
-              </Typography>
-              <DatePicker
-                selected={pickupDate}
-                onChange={date => setPickupDate(date)}
-                placeholderText="Select Date"
-                dateFormat="yyyy/MM/dd"
-                customInput={
-                  <TextField
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    sx={{ mb: 2, mt: 0.5 }}
-                  />
-                }
-              />
-              <Typography variant="caption" color="text.secondary">
-                Return Date
-              </Typography>
-              <DatePicker
-                selected={returnDate}
-                onChange={date => setReturnDate(date)}
-                placeholderText="Select Date"
-                dateFormat="yyyy/MM/dd"
-                customInput={
-                  <TextField
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    sx={{ mb: 2, mt: 0.5 }}
-                  />
-                }
-              />
-              <TextField
-                label="Fuel Type"
-                select
-                value={fuelType}
-                onChange={e => setFuelType(e.target.value)}
-                variant="outlined"
-                size="small"
-                fullWidth
-                sx={{ mb: 2 }}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="Benzine">Benzine</MenuItem>
-                <MenuItem value="Diesel">Diesel</MenuItem>
-                <MenuItem value="Electric">Electric</MenuItem>
-              </TextField>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Vehicle Type
-              </Typography>
-              <Stack>
+          <Box sx={{ minWidth: 250, p: 3, bgcolor: '#f7f9fc', borderRadius: 4 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Filters</Typography>
+            <Stack spacing={3}>
+              <div>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Car Type</Typography>
                 {carTypes.map(type => (
                   <FormControlLabel
                     key={type.value}
-                    control={
-                      <Checkbox
-                        checked={selectedTypes.includes(type.value)}
-                        onChange={() => handleTypeChange(type.value)}
-                        color="primary"
-                      />
-                    }
+                    control={<Checkbox checked={selectedTypes.includes(type.value)} 
+                    onChange={() => handleTypeChange(type.value)} />}
                     label={type.label}
                   />
                 ))}
-              </Stack>
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                sx={{ mt: 3, borderRadius: 3, fontWeight: 700, py: 1 }}
-              >
-                Search
-              </Button>
-            </Paper>
+              </div>
+              <div>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Fuel Type</Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={fuelType}
+                  onChange={(e) => setFuelType(e.target.value)}
+                  size="small"
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="Petrol">Petrol</MenuItem>
+                  <MenuItem value="Diesel">Diesel</MenuItem>
+                  <MenuItem value="Electric">Electric</MenuItem>
+                  <MenuItem value="Hybrid">Hybrid</MenuItem>
+                </TextField>
+              </div>
+            </Stack>
           </Box>
         </Box>
+
         <BookingModal />
       </Container>
     </Box>

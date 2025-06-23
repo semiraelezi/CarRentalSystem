@@ -1,4 +1,4 @@
-using CarRentalSystem.Data;
+﻿using CarRentalSystem.Data;
 using CarRentalSystem.Services;
 using CarRentalSystem.Services.Implementations;
 using CarRentalSystem.Services.Interfaces;
@@ -7,51 +7,38 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure EF Core with PostgreSQL
+// -------------------- CORS CONFIG --------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+// -------------------- DATABASE & IDENTITY --------------------
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add Identity with ApplicationUser and roles, configure password options
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = false;
     options.Password.RequiredLength = 6;
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-// Register TokenService for dependency injection
-builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<ICarService, CarService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IRentalService, RentalService>();
-builder.Services.AddTransient<SimpleEmailSender>();
-
-
-
-// Read JWT settings from configuration
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-
-var jwtKey = jwtSettings["Key"];
-var jwtIssuer = jwtSettings["Issuer"];
-var jwtAudience = jwtSettings["Audience"];
-
-if (string.IsNullOrEmpty(jwtKey) || string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
-{
-    throw new InvalidOperationException("JWT configuration is missing or incomplete.");
-}
-
-var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-// Configure Authentication with JWT Bearer (ONLY ONCE)
+// -------------------- JWT AUTHENTICATION --------------------
+var jwtConfig = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -65,42 +52,57 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-
-        ValidIssuer = "MyIssuer",
-        ValidAudience = "MyAudience",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("qLiw6VbnnQlWj5zv1Lr3liiXswJ93XsQjSvVz8OmhBI="))
+        ValidIssuer = jwtConfig["Issuer"],
+        ValidAudience = jwtConfig["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig["Key"]!)),
+        ClockSkew = TimeSpan.Zero
     };
 
-    // Optional: log failures for debugging
     options.Events = new JwtBearerEvents
     {
         OnAuthenticationFailed = context =>
         {
             Console.WriteLine($"Authentication failed: {context.Exception.Message}");
             return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("Token successfully validated.");
+            return Task.CompletedTask;
         }
     };
 });
 
-// Add Controllers
+// -------------------- SERVICES --------------------
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ICarService, CarService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRentalService, RentalService>();
+builder.Services.AddTransient<SimpleEmailSender>();
+
+// -------------------- CONTROLLERS --------------------
 builder.Services.AddControllers();
 
-// Add Swagger with JWT Bearer support
-builder.Services.AddSwaggerGen(options =>
+// -------------------- SWAGGER --------------------
+builder.Services.AddSwaggerGen(c =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "CarRentalSystem API", Version = "v1" });
-
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
-        In = ParameterLocation.Header,
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Title = "CarRentalSystem API",
+        Version = "v1",
+        Description = "API for managing car rentals, users, and bookings."
+    });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme (Example: 'Bearer {token}')",
         Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
@@ -118,7 +120,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Seed default admin user on startup
+// -------------------- SEED ADMIN --------------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -133,13 +135,26 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// -------------------- MIDDLEWARE --------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "CarRentalSystem API v1");
+        c.RoutePrefix = "swagger";
+    });
 }
 
-app.UseHttpsRedirection();
+// ❌ Remove HTTPS redirect for local dev (fixes CORS redirect error)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseRouting();
+
+app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();

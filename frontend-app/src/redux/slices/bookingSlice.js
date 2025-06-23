@@ -1,42 +1,24 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  bookings: [],
-  currentBooking: null,
   isBookingModalOpen: false,
+  currentBooking: null,  // store all dates as ISO strings here
 };
 
-export const bookingSlice = createSlice({
+const bookingSlice = createSlice({
   name: 'bookings',
   initialState,
   reducers: {
-    openBookingModal: (state, action) => {
-      state.currentBooking = action.payload;
+    openBookingModal(state, action) {
       state.isBookingModalOpen = true;
+      state.currentBooking = { ...action.payload };
     },
-    closeBookingModal: (state) => {
-      state.currentBooking = null;
-      state.isBookingModalOpen = false;
-    },
-    addBooking: (state, action) => {
-      const newBooking = {
-        id: Date.now(), // Simple ID generation
-        ...action.payload,
-        status: 'confirmed',
-        bookingDate: new Date().toISOString(),
-      };
-      state.bookings.push(newBooking);
+    closeBookingModal(state) {
       state.isBookingModalOpen = false;
       state.currentBooking = null;
     },
-    cancelBooking: (state, action) => {
-      const index = state.bookings.findIndex(booking => booking.id === action.payload);
-      if (index !== -1) {
-        state.bookings[index].status = 'cancelled';
-      }
-    },
-  },
+  }
 });
 
-export const { openBookingModal, closeBookingModal, addBooking, cancelBooking } = bookingSlice.actions;
+export const { openBookingModal, closeBookingModal } = bookingSlice.actions;
 export default bookingSlice.reducer;

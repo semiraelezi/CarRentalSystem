@@ -12,26 +12,41 @@ namespace CarRentalSystem.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _configuration;
-        private const int ExpireMinutes = 30;
+        private readonly ILogger<TokenService> _logger;
 
-        public TokenService(UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public TokenService(
+            UserManager<ApplicationUser> userManager,
+            IConfiguration configuration,
+            ILogger<TokenService> logger)
         {
             _userManager = userManager;
             _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task<string> CreateToken(ApplicationUser user)
         {
-            var expiration = DateTime.UtcNow.AddMinutes(ExpireMinutes);
-            var roles = await _userManager.GetRolesAsync(user);
+            try
+            {
+                var expiration = DateTime.UtcNow.AddMinutes(
+                    _configuration.GetValue<int>("Jwt:ExpireMinutes", 30));
 
-            var token = CreateJwtToken(
-                CreateClaims(user, roles),
-                CreateSigningCredentials(),
-                expiration);
+                var roles = await _userManager.GetRolesAsync(user);
+                _logger.LogInformation("Creating token for user {UserId} with roles {Roles}", user.Id, string.Join(",", roles));
 
-            var tokenHandler = new JwtSecurityTokenHandler();
-            return tokenHandler.WriteToken(token);
+                var token = CreateJwtToken(
+                    CreateClaims(user, roles),
+                    CreateSigningCredentials(),
+                    expiration
+                );
+
+                return new JwtSecurityTokenHandler().WriteToken(token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating token for user {UserId}", user.Id);
+                throw;
+            }
         }
 
         private List<Claim> CreateClaims(ApplicationUser user, IList<string> roles)
@@ -39,8 +54,10 @@ namespace CarRentalSystem.Services
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.NameIdentifier, user.Id) // ✅ User ID claim
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id), // Standard JWT claim
+                new Claim(ClaimTypes.NameIdentifier, user.Id), // ASP.NET Core default
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.UserName)
             };
 
             foreach (var role in roles)
@@ -51,21 +68,23 @@ namespace CarRentalSystem.Services
             return claims;
         }
 
-        private JwtSecurityToken CreateJwtToken(List<Claim> claims, SigningCredentials signingCredentials, DateTime expiration)
+        private JwtSecurityToken CreateJwtToken(List<Claim> claims, SigningCredentials credentials, DateTime expiration)
         {
             return new JwtSecurityToken(
-                issuer: "MyIssuer",
-                audience: "MyAudience",
-                expires: expiration,
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                signingCredentials: signingCredentials);
+                expires: expiration,
+                signingCredentials: credentials
+            );
         }
 
         private SigningCredentials CreateSigningCredentials()
         {
-            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("qLiw6VbnnQlWj5zv1Lr3liiXswJ93XsQjSvVz8OmhBI="));
-
-            return new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_configuration["Jwt:Key"])
+            );
+            return new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         }
     }
 }

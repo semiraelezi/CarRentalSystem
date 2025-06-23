@@ -9,7 +9,6 @@ namespace CarRentalSystem.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]  // Optional, require admin role
     public class CarController : ControllerBase
     {
         private readonly ICarService _carService;
@@ -19,16 +18,18 @@ namespace CarRentalSystem.Controllers
             _carService = carService;
         }
 
-        // GET api/car
+        // GET: api/car
         [HttpGet]
+        [AllowAnonymous]  // Anyone can get car list
         public async Task<ActionResult<IEnumerable<CarDTO>>> GetAll()
         {
             var cars = await _carService.GetAllCarsAsync();
             return Ok(cars);
         }
 
-        // GET api/car/5
+        // GET: api/car/5
         [HttpGet("{id}")]
+        [AllowAnonymous]  // Anyone can get car details
         public async Task<ActionResult<CarDTO>> GetById(int id)
         {
             var car = await _carService.GetCarByIdAsync(id);
@@ -38,18 +39,18 @@ namespace CarRentalSystem.Controllers
             return Ok(car);
         }
 
-        // POST api/car
+        // POST: api/car
         [HttpPost]
+        [Authorize(Roles = "Admin")]  // Only admin can create cars
         public async Task<ActionResult> Create([FromBody] CarCreateDTO carDto)
         {
             var createdCar = await _carService.CreateCarAsync(carDto);
-
-            // Return CreatedAtAction with new car's id for RESTful response
             return CreatedAtAction(nameof(GetById), new { id = createdCar.CarId }, createdCar);
         }
 
-        // PUT api/car/5
+        // PUT: api/car/5
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]  // Only admin can update cars
         public async Task<ActionResult> Update(int id, [FromBody] CarUpdateDTO carDto)
         {
             var success = await _carService.UpdateCarAsync(id, carDto);
@@ -59,8 +60,9 @@ namespace CarRentalSystem.Controllers
             return NoContent();
         }
 
-        // DELETE api/car/5
+        // DELETE: api/car/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]  // Only admin can delete cars
         public async Task<ActionResult> Delete(int id)
         {
             var success = await _carService.DeleteCarAsync(id);

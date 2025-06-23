@@ -1,8 +1,9 @@
-﻿using CarRentalSystem.Data;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using CarRentalSystem.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 namespace CarRentalSystem.Data
 {
@@ -14,35 +15,48 @@ namespace CarRentalSystem.Data
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
             // Ensure roles exist
-            var roles = new[] { "Admin", "User" };
-            foreach (var role in roles)
+            foreach (var role in new[] { "Admin", "User" })
             {
                 if (!await roleManager.RoleExistsAsync(role))
-                    await roleManager.CreateAsync(new IdentityRole(role));
+                {
+                    var roleResult = await roleManager.CreateAsync(new IdentityRole(role));
+                    if (!roleResult.Succeeded)
+                    {
+                        var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                        throw new Exception($"Role creation failed: {errors}");
+                    }
+                }
             }
 
-            // Seed default Admin
+            // Seed default Admin user
             var adminEmail = "semiraelezi@gmail.com";
             var adminPassword = "Mila1209!";
 
-            if (await userManager.FindByEmailAsync(adminEmail) == null)
+            var existingUser = await userManager.FindByEmailAsync(adminEmail);
+            if (existingUser == null)
             {
                 var adminUser = new ApplicationUser
                 {
                     UserName = adminEmail,
                     Email = adminEmail,
-                    EmailConfirmed = true,
-                    PhoneNumber = "0000000000"
+                    Name = "Admin",
+                    Surname = "User",
+                    PhoneNumber = "0000000000",
+                    EmailConfirmed = true
                 };
 
-                var result = await userManager.CreateAsync(adminUser, adminPassword);
-                if (result.Succeeded)
+                var createResult = await userManager.CreateAsync(adminUser, adminPassword);
+                if (!createResult.Succeeded)
                 {
-                    await userManager.AddToRoleAsync(adminUser, "Admin");
+                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Admin user creation failed: {errors}");
                 }
-                else
+
+                var roleResult = await userManager.AddToRoleAsync(adminUser, "Admin");
+                if (!roleResult.Succeeded)
                 {
-                    throw new Exception($"Failed to create admin user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                    var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Role assignment failed: {errors}");
                 }
             }
         }

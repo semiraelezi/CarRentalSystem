@@ -1,83 +1,136 @@
+// src/components/auth/Register.jsx
 import { useState } from 'react';
-import { Container, Box, Typography, TextField, Button, Paper, Link } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { registerUser } from '../../api/auth';
+import {
+  Alert,
+  Button,
+  TextField,
+  Paper,
+  Container,
+  Box,
+  Typography,
+  Link,
+  Snackbar,
+} from '@mui/material';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    surname: '',
+    email: '',
+    password: '',
+    confirm: '',
+    phoneNumber: '',
+    driversLicenseNumber: '',
+  });
 
-  // You can add registration logic here
+  const [error, setError] = useState('');
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const navigate = useNavigate();
+
+  const handleChange = (e) =>
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (form.password !== form.confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    try {
+      await registerUser(form);
+      setOpenSnackbar(true);
+      setTimeout(() => navigate('/login'), 2000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   return (
     <Box
-      sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to bottom right, #fff 60%, #1565c0 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       <Container maxWidth="xs">
-        <Paper elevation={6} sx={{ p: 4, borderRadius: 4 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <img
-              src="https://trilon.mk/wp-content/uploads/2021/06/cropped-logo-1.png"
-              alt="Logo"
-              style={{ width: 60, marginBottom: 10 }}
-            />
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1565c0' }}>
-              Create Account
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Sign up to start your journey
-            </Typography>
-          </Box>
-          <form>
+        <Paper sx={{ p: 4, borderRadius: 4 }}>
+          <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#1565c0' }}>
+            Create Account
+          </Typography>
+          <form onSubmit={handleSubmit}>
             <TextField
-              label="Full Name"
-              variant="outlined"
+              label="Name"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
               fullWidth
               required
               margin="normal"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              sx={{ bgcolor: '#f7f9fc', borderRadius: 2 }}
+            />
+            <TextField
+              label="Surname"
+              name="surname"
+              value={form.surname}
+              onChange={handleChange}
+              fullWidth
+              required
+              margin="normal"
             />
             <TextField
               label="Email"
+              name="email"
               type="email"
-              variant="outlined"
+              value={form.email}
+              onChange={handleChange}
               fullWidth
               required
               margin="normal"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              sx={{ bgcolor: '#f7f9fc', borderRadius: 2 }}
+            />
+            <TextField
+              label="Phone Number"
+              name="phoneNumber"
+              value={form.phoneNumber}
+              onChange={handleChange}
+              fullWidth
+              required
+              margin="normal"
+            />
+            <TextField
+              label="Driver's License Number"
+              name="driversLicenseNumber"
+              value={form.driversLicenseNumber}
+              onChange={handleChange}
+              fullWidth
+              required
+              margin="normal"
             />
             <TextField
               label="Password"
+              name="password"
               type="password"
-              variant="outlined"
+              value={form.password}
+              onChange={handleChange}
               fullWidth
               required
               margin="normal"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              sx={{ bgcolor: '#f7f9fc', borderRadius: 2 }}
             />
             <TextField
               label="Confirm Password"
+              name="confirm"
               type="password"
-              variant="outlined"
+              value={form.confirm}
+              onChange={handleChange}
               fullWidth
               required
               margin="normal"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              sx={{ bgcolor: '#f7f9fc', borderRadius: 2 }}
             />
+            {error && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+              </Alert>
+            )}
             <Button
               type="submit"
               variant="contained"
@@ -95,6 +148,17 @@ export default function Register() {
             </Link>
           </Box>
         </Paper>
+
+        <Snackbar
+          open={openSnackbar}
+          autoHideDuration={3000}
+          onClose={() => setOpenSnackbar(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setOpenSnackbar(false)} severity="success" sx={{ width: '100%' }}>
+            Registration successful! Redirecting to login...
+          </Alert>
+        </Snackbar>
       </Container>
     </Box>
   );

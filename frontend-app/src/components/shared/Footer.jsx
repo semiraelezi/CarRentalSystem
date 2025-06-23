@@ -1,3 +1,4 @@
+// Footer.js
 import { Box, Container, Grid, Typography, Link, IconButton } from '@mui/material';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import TwitterIcon from '@mui/icons-material/Twitter';
@@ -45,9 +46,7 @@ export default function Footer() {
               <Link href="/about" underline="hover" sx={{ color: '#fff', mb: 1 }}>
                 About Us
               </Link>
-              <Link href="/contact" underline="hover" sx={{ color: '#fff', mb: 1 }}>
-                Contact
-              </Link>
+              
             </Box>
           </Grid>
           <Grid item xs={12} md={4}>

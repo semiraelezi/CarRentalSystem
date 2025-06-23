@@ -29,7 +29,10 @@ export default function Dashboard() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', background: '#f4f6fa' }}>
-      <AppBar position="fixed" sx={{ width: `calc(100% - ${drawerWidth}px)`, ml: `${drawerWidth}px`, bgcolor: '#1565c0' }}>
+      <AppBar
+        position="fixed"
+        sx={{ width: `calc(100% - ${drawerWidth}px)`, ml: `${drawerWidth}px`, bgcolor: '#1565c0' }}
+      >
         <Toolbar>
           <Typography variant="h6" noWrap>
             Admin Dashboard
@@ -124,10 +127,10 @@ export default function Dashboard() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Routes>
-          <Route path="/" element={<AdminHome />} />
-          <Route path="/cars" element={<CarManagement />} />
-          <Route path="/users" element={<UserManagement />} />
-          <Route path="/bookings" element={<BookingManagement />} />
+          <Route path="" element={<AdminHome />} />
+          <Route path="cars" element={<CarManagement />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="bookings" element={<BookingManagement />} />
         </Routes>
       </Box>
     </Box>

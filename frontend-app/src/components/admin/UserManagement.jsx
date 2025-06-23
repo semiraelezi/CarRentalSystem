@@ -17,253 +17,368 @@ import {
   DialogActions,
   TextField,
   Stack,
-  Chip,
   CircularProgress,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { fetchUsers, saveUser, deleteUser } from '../../api/users';
+import AddIcon from '@mui/icons-material/Add';
+import {
+  fetchUsers,
+  deleteUser,
+  updateUser,
+  createUser,
+  searchUsers,
+} from '../../api/users';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [form, setForm] = useState({
     name: '',
+    surname: '',
     email: '',
-    phone: '',
-    status: 'active',
-    role: 'user',
-    license: '',
+    phoneNumber: '',
+    driverLicense: '',
+    password: '',
+    confirmPassword: ''
   });
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState({ name: '', surname: '' });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [isAddMode, setIsAddMode] = useState(false);
 
   useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const data = await fetchUsers();
-        setUsers(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadUsers();
   }, []);
 
-  // Open modal for add or edit
-  const handleOpen = (user = null) => {
-    setEditingUser(user);
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchUsers();
+      setUsers(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch users.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDialog = (user = null) => {
+    setIsAddMode(!user);
+    setCurrentUser(user);
     setForm(
       user
-        ? { ...user }
+        ? {
+            name: user.name || '',
+            surname: user.surname || '',
+            email: user.email || '',
+            phoneNumber: user.phoneNumber || '',
+            driverLicense: user.driverLicense || '',
+            password: '',
+            confirmPassword: ''
+          }
         : {
             name: '',
+            surname: '',
             email: '',
-            phone: '',
-            status: 'active',
-            role: 'user',
-            license: '',
+            phoneNumber: '',
+            driverLicense: '',
+            password: '',
+            confirmPassword: ''
           }
     );
-    setOpen(true);
+    setOpenDialog(true);
   };
 
-  // Close modal
-  const handleClose = () => {
-    setOpen(false);
-    setEditingUser(null);
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setCurrentUser(null);
   };
 
-  // Handle form input
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Add or Edit user
+  const validateForm = () => {
+    if (isAddMode) {
+      if (!form.name || !form.surname || !form.email || !form.password) {
+        setError('Name, surname, email and password are required');
+        return false;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError('Passwords do not match');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
-    if (!form.name || !form.email || !form.phone || !form.license) {
-      alert('Please fill in all fields.');
-      return;
-    }
+    if (!validateForm()) return;
+
     try {
-      const savedUser = await saveUser(form);
-      if (editingUser) {
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? savedUser : u));
+      setLoading(true);
+      setError(null);
+
+      if (isAddMode) {
+        await createUser({
+          Name: form.name,
+          Surname: form.surname,
+          Email: form.email,
+          PhoneNumber: form.phoneNumber,
+          DriverLicense: form.driverLicense,
+          Password: form.password
+        });
+        setSuccess('User created successfully!');
       } else {
-        setUsers(prev => [...prev, savedUser]);
+        await updateUser(currentUser.id, {
+          Email: form.email,
+          PhoneNumber: form.phoneNumber,
+          DriverLicense: form.driverLicense
+        });
+        setSuccess('User updated successfully!');
       }
-      handleClose();
+
+      loadUsers();
+      handleCloseDialog();
     } catch (err) {
-      alert('Failed to save user');
+      setError(err.message || (isAddMode ? 'Failed to create user' : 'Failed to update user'));
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Delete user
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+  const handleDelete = async (user) => {
+    if (window.confirm(`Are you sure you want to delete ${user.email}?`)) {
       try {
-        await deleteUser(id);
-        setUsers(prev => prev.filter(user => user.id !== id));
+        setLoading(true);
+        await deleteUser(user.id);
+        setSuccess('User deleted successfully!');
+        setUsers(prev => prev.filter(u => u.id !== user.id));
       } catch (err) {
-        alert('Failed to delete user');
+        setError(err.message || 'Failed to delete user.');
+      } finally {
+        setLoading(false);
       }
     }
   };
 
-  // Toggle user status
-  const handleToggleStatus = (id) => {
-    setUsers(prev =>
-      prev.map(user =>
-        user.id === id
-          ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-          : user
-      )
-    );
+  const handleSearch = async () => {
+    try {
+      setLoading(true);
+      const data = await searchUsers(search.name, search.surname);
+      setUsers(data);
+    } catch (err) {
+      setError(err.message || 'Search failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) return <CircularProgress sx={{ display: 'block', mx: 'auto', my: 4 }} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  const handleReset = () => {
+    setSearch({ name: '', surname: '' });
+    loadUsers();
+  };
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
         User Management
       </Typography>
-      <Button
-        variant="contained"
-        color="primary"
-        sx={{ mb: 2, borderRadius: 2 }}
-        onClick={() => handleOpen()}
-      >
-        Add User
-      </Button>
-      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Driver License</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.phone}</TableCell>
-                <TableCell>{user.license}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={user.status}
-                    color={user.status === 'active' ? 'success' : 'default'}
-                    size="small"
-                    onClick={() => handleToggleStatus(user.id)}
-                    sx={{ cursor: 'pointer' }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={user.role}
-                    color={user.role === 'admin' ? 'primary' : 'default'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton color="primary" onClick={() => handleOpen(user)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => handleDelete(user.id)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-            {users.length === 0 && (
+
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Add User
+        </Button>
+      </Stack>
+
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <TextField
+          name="name"
+          label="Name"
+          value={search.name}
+          onChange={(e) => setSearch({ ...search, name: e.target.value })}
+          size="small"
+        />
+        <TextField
+          name="surname"
+          label="Surname"
+          value={search.surname}
+          onChange={(e) => setSearch({ ...search, surname: e.target.value })}
+          size="small"
+        />
+        <Button variant="contained" onClick={handleSearch} disabled={loading}>
+          Search
+        </Button>
+        <Button variant="outlined" onClick={handleReset} disabled={loading}>
+          Reset
+        </Button>
+      </Stack>
+
+      {loading && users.length === 0 ? (
+        <CircularProgress sx={{ display: 'block', mx: 'auto', my: 4 }} />
+      ) : error ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={7} align="center">
-                  No users found.
-                </TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Surname</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Phone</TableCell>
+                <TableCell>Driver License</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      {/* Add/Edit User Modal */}
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingUser ? 'Edit User' : 'Add User'}</DialogTitle>
+            </TableHead>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.name}</TableCell>
+                  <TableCell>{user.surname}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.phoneNumber}</TableCell>
+                  <TableCell>{user.driverLicense}</TableCell>
+                  <TableCell align="right">
+                    <IconButton onClick={() => handleOpenDialog(user)} disabled={loading}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton 
+                      color="error" 
+                      onClick={() => handleDelete(user)}
+                      disabled={loading}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {users.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
+        <DialogTitle>{isAddMode ? 'Add New User' : 'Edit User'}</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Name"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              fullWidth
-            />
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            {isAddMode && (
+              <>
+                <TextField
+                  label="Name"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Surname"
+                  name="surname"
+                  value={form.surname}
+                  onChange={handleChange}
+                  fullWidth
+                  required
+                />
+              </>
+            )}
             <TextField
               label="Email"
               name="email"
+              type="email"
               value={form.email}
               onChange={handleChange}
               fullWidth
-              type="email"
+              required
             />
             <TextField
-              label="Phone"
-              name="phone"
-              value={form.phone}
+              label="Phone Number"
+              name="phoneNumber"
+              value={form.phoneNumber}
               onChange={handleChange}
               fullWidth
             />
             <TextField
               label="Driver License"
-              name="license"
-              value={form.license}
+              name="driverLicense"
+              value={form.driverLicense}
               onChange={handleChange}
               fullWidth
             />
-            <TextField
-              label="Status"
-              name="status"
-              value={form.status}
-              onChange={handleChange}
-              select
-              fullWidth
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </TextField>
-            <TextField
-              label="Role"
-              name="role"
-              value={form.role}
-              onChange={handleChange}
-              select
-              fullWidth
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </TextField>
+            {isAddMode && (
+              <>
+                <TextField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Confirm Password"
+                  name="confirmPassword"
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  fullWidth
+                  required
+                />
+              </>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose} color="inherit">
+          <Button onClick={handleCloseDialog} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {editingUser ? 'Update' : 'Add'}
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={loading}
+            color={isAddMode ? 'success' : 'primary'}
+          >
+            {loading ? (
+              <CircularProgress size={24} />
+            ) : isAddMode ? (
+              'Create User'
+            ) : (
+              'Update User'
+            )}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={!!success}
+        autoHideDuration={6000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

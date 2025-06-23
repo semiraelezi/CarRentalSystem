@@ -1,30 +1,52 @@
-// Simulated API calls for bookings
-export async function fetchBookings() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          {
-            id: 101,
-            car: { id: 1, make: 'Volkswagen', model: 'Golf', licensePlate: 'SK-1234-AB' },
-            user: { id: 1, name: 'John Doe', phone: '123456789' },
-            pickupDate: '2025-06-01',
-            returnDate: '2025-06-05',
-            pickupLocation: 'Skopje',
-            returnLocation: 'Skopje',
-            status: 'confirmed',
-            totalCost: 140,
-          },
-          // ...more mock bookings
-        ]);
-      }, 400);
-    });
+const API_BASE_URL = "http://localhost:5000/api/rentals";
+
+export async function createBooking(bookingData) {
+  const token = localStorage.getItem("token");
+  const response = await fetch(API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(bookingData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "Failed to create booking");
   }
-  
-  export async function updateBookingStatus(bookingId, status) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, bookingId, status });
-      }, 300);
-    });
+
+  return response.json();
+}
+export async function cancelBooking(rentalId) {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_BASE_URL}/cancel/${rentalId}`, {
+    method: "DELETE",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "Failed to cancel booking");
   }
-  
+
+  return response.json();
+}
+
+export async function getUserBookings() {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_BASE_URL}/user`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "Failed to fetch bookings");
+  }
+
+  return response.json();
+}

@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { fetchBookings, updateBookingStatus } from '../../api/bookings';
+import { rentalService } from '../../api/bookings';
 
 // Mock bookings data for demonstration
 const initialBookings = [
@@ -51,8 +51,8 @@ const initialBookings = [
 ];
 
 export default function BookingManagement() {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [bookings, setBookings] = useState(initialBookings); // Using mock data initially
+  const [loading, setLoading] = useState(false); // Changed to false since we're using mock data
   const [error, setError] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [open, setOpen] = useState(false);
@@ -60,8 +60,10 @@ export default function BookingManagement() {
   useEffect(() => {
     const loadBookings = async () => {
       try {
-        const data = await fetchBookings();
-        setBookings(data);
+        setLoading(true);
+        // Uncomment this when your backend is ready
+        // const data = await rentalService.getAllBookings();
+        // setBookings(data);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -83,8 +85,11 @@ export default function BookingManagement() {
 
   const handleCancel = async (id) => {
     try {
-      await updateBookingStatus(id, 'cancelled');
-      setBookings(prev => prev.map(b => b.id === id ? {...b, status: 'cancelled'} : b));
+      // Uncomment when backend is ready
+      // await rentalService.updateBookingStatus(id, 'cancelled');
+      setBookings(prev => prev.map(b => 
+        b.id === id ? {...b, status: 'cancelled'} : b
+      ));
       handleClose();
     } catch (err) {
       alert('Failed to cancel booking');
@@ -93,8 +98,11 @@ export default function BookingManagement() {
 
   const handleComplete = async (id) => {
     try {
-      await updateBookingStatus(id, 'completed');
-      setBookings(prev => prev.map(b => b.id === id ? {...b, status: 'completed'} : b));
+      // Uncomment when backend is ready
+      // await rentalService.updateBookingStatus(id, 'completed');
+      setBookings(prev => prev.map(b => 
+        b.id === id ? {...b, status: 'completed'} : b
+      ));
       handleClose();
     } catch (err) {
       alert('Failed to complete booking');
@@ -183,13 +191,6 @@ export default function BookingManagement() {
                 </TableCell>
               </TableRow>
             ))}
-            {bookings.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  No bookings found.
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -239,7 +240,7 @@ export default function BookingManagement() {
                 startIcon={<CheckCircleIcon />}
                 onClick={() => handleComplete(selectedBooking.id)}
               >
-                Mark as Completed
+                Complete
               </Button>
             </>
           )}
